@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+api_key.py
+__pycache__/
+*.py[cod]
+*.pyo
+
+# C extensions
+*.so
+
+# Environment variables
+.env
+
+# Virtual environment
+venv/
+env/
+
+# Flet assets
+assets/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE-specific files
+.vscode/
+.idea/
