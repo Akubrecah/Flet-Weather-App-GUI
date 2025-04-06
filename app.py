@@ -45,7 +45,7 @@ def get_weather_details():
             if not data:
                 print("Empty response from API")
                 return None
-                
+
             weather_data = {
                 "description": data["weather"][0]["description"].capitalize(),
                 "humidity": data["main"]["humidity"],
@@ -54,7 +54,7 @@ def get_weather_details():
             }
             print("Weather details:", weather_data)  # Debug print
             return weather_data
-            
+
         except (KeyError, TypeError, ValueError) as e:
             print(f"Error parsing weather details: {e}")
             return None
@@ -67,22 +67,23 @@ def main(page: Page):
     page.vertical_alignment = "center"
     page.title = "Weather App"
 
+    # Initialize current as a list to make it mutable
+    current = [fetch_weather_data("London")]
+
     def update_weather(e):
-        global current
         if not city_search.value:
             page.show_snack_bar(SnackBar(content=Text("Please enter a city name")))
             return
-            
-        current = fetch_weather_data(city_search.value)
-        if current:
+
+        new_data = fetch_weather_data(city_search.value)
+        if new_data:
+            current[0] = new_data  # Update the mutable list
             # Create new top container with updated data
             new_top = top()
-            # Update the Stack's controls
-            c.content.controls[1].controls[0] = new_top
-            c.content.controls[1].controls[0].update()
-            city_search.value = ""  # Clear the search field
-            city_search.update()
-            page.update()  # Update the entire page
+            # Clear and rebuild the Stack's controls
+            c.content.controls[1].controls = [new_top]
+            city_search.value = ""
+            page.update()
         else:
             page.show_snack_bar(SnackBar(content=Text("City not found or network error")))
 
@@ -126,9 +127,9 @@ def main(page: Page):
             c.content.controls[1].controls[0].update()
 
     def current_temp():
-        if current is not None:
+        if current[0] is not None:
             try:
-                data = current.json()
+                data = current[0].json()
                 temperature = data["main"]["temp"]
                 return int(round(temperature))  # Round to nearest integer
             except (KeyError, TypeError, ValueError) as e:
@@ -139,6 +140,7 @@ def main(page: Page):
     def top():
         today_temp = current_temp()
         weather_details = get_weather_details()
+        city_name = current[0].json()["name"] if current[0] else "Enter City"
 
         details_row = Row(
             alignment="center",
@@ -182,8 +184,6 @@ def main(page: Page):
                 ),
             ]
         )
-
-        city_name = current.json()["name"] if current else "Enter City"
 
         top = Container(
             width=310,
