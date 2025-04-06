@@ -121,6 +121,7 @@ def main(page: Page):
     # Initialize current as a list to make it mutable
     current = [fetch_weather_data("London")]
     forecast = [fetch_weekly_forecast("London")]  # New mutable forecast list
+    current_city = ["London"]  # Track current city
 
     def update_weather(e):
         if not city_search.value:
@@ -132,6 +133,7 @@ def main(page: Page):
         if new_data and new_forecast:
             current[0] = new_data
             forecast[0] = new_forecast  # Update forecast data
+            current_city[0] = city_search.value  # Update current city
             new_top = top()
             new_forecast_container = weekly_forecast_container()  # New forecast container
             # Update both containers in the column
@@ -156,7 +158,7 @@ def main(page: Page):
             "wind": {
                 "speed": day_data['full_data']['wind']['speed']
             },
-            "name": current[0].json()["name"] if current[0] else "Unknown City"
+            "name": current_city[0]  # Use the current city name
         }
         
         # Update the current weather display
@@ -269,7 +271,7 @@ def main(page: Page):
             margin=margin.only(top=10),
             content=Column(
                 controls=[
-                    Text("Weekly Forecast", color="white", size=16, weight="bold"),
+                    Text(f"Weekly Forecast for {current_city[0]}", color="white", size=16, weight="bold"),
                     *forecast_items
                 ],
                 spacing=5,
