@@ -23,8 +23,21 @@ def fetch_weather_data(city):
         print(f"Error fetching weather data: {e}")
         return None
 
+# New function to fetch weekly forecast data
+def fetch_weekly_forecast(city):
+    try:
+        response = requests.get(
+            f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
+        )
+        response.raise_for_status()
+        return response
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching forecast data: {e}")
+        return None
+
 # API request with error handling
 current = fetch_weather_data("London")
+forecast = fetch_weekly_forecast("London")  # New forecast variable
 
 # List of days
 days = [
@@ -60,6 +73,44 @@ def get_weather_details():
             return None
     return None
 
+# New function to get weekly forecast details
+def get_weekly_forecast():
+    if forecast is None:
+        return None
+        
+    try:
+        data = forecast.json()
+        if not data or 'list' not in data:
+            return None
+            
+        # Group forecasts by day
+        daily_data = {}
+        for item in data['list']:
+            date = datetime.datetime.fromtimestamp(item['dt']).strftime('%Y-%m-%d')
+            if date not in daily_data:
+                daily_data[date] = []
+            daily_data[date].append(item)
+        
+        # Get one forecast per day (midday if possible)
+        weekly_forecast = []
+        for date, items in daily_data.items():
+            # Find forecast closest to 12:00 PM
+            midday_forecast = min(items, key=lambda x: abs(12 - int(datetime.datetime.fromtimestamp(x['dt']).strftime('%H'))))
+            day_name = datetime.datetime.fromtimestamp(midday_forecast['dt']).strftime('%A')
+            weekly_forecast.append({
+                'day': day_name,
+                'temp': round(midday_forecast['main']['temp']),
+                'description': midday_forecast['weather'][0]['description'].capitalize(),
+                'icon': midday_forecast['weather'][0]['icon'][:2] + 'd',  # Ensure day icon
+                'full_data': midday_forecast  # Store full data for click functionality
+            })
+        
+        return weekly_forecast[:7]  # Return up to 7 days
+        
+    except Exception as e:
+        print(f"Error parsing forecast data: {e}")
+        return None
+
 
 def main(page: Page):
     # Page setup
@@ -69,6 +120,7 @@ def main(page: Page):
 
     # Initialize current as a list to make it mutable
     current = [fetch_weather_data("London")]
+    forecast = [fetch_weekly_forecast("London")]  # New mutable forecast list
 
     def update_weather(e):
         if not city_search.value:
@@ -76,16 +128,42 @@ def main(page: Page):
             return
 
         new_data = fetch_weather_data(city_search.value)
-        if new_data:
-            current[0] = new_data  # Update the mutable list
-            # Create new top container with updated data
+        new_forecast = fetch_weekly_forecast(city_search.value)  # New forecast fetch
+        if new_data and new_forecast:
+            current[0] = new_data
+            forecast[0] = new_forecast  # Update forecast data
             new_top = top()
-            # Clear and rebuild the Stack's controls
-            c.content.controls[1].controls = [new_top]
+            new_forecast_container = weekly_forecast_container()  # New forecast container
+            # Update both containers in the column
+            c.content.controls[1].content.controls = [new_top, new_forecast_container]
             city_search.value = ""
             page.update()
         else:
             page.show_snack_bar(SnackBar(content=Text("City not found or network error")))
+
+    def update_day_weather(day_data):
+        # Create a fake current weather response using the day's forecast data
+        fake_current = {
+            "weather": [{
+                "description": day_data['description'].lower(),
+                "icon": day_data['icon']
+            }],
+            "main": {
+                "temp": day_data['temp'],
+                "humidity": day_data['full_data']['main']['humidity'],
+                "pressure": day_data['full_data']['main']['pressure']
+            },
+            "wind": {
+                "speed": day_data['full_data']['wind']['speed']
+            },
+            "name": current[0].json()["name"] if current[0] else "Unknown City"
+        }
+        
+        # Update the current weather display
+        current[0] = type('obj', (object,), {'json': lambda: fake_current})()
+        new_top = top()
+        c.content.controls[1].content.controls[0] = new_top
+        page.update()
 
     city_search = TextField(
         hint_text="Enter city name",
@@ -93,15 +171,15 @@ def main(page: Page):
         height=40,
         text_size=14,
         border_radius=6,
-        on_submit=lambda e: update_weather(e),  # Add this line to handle Enter key
+        on_submit=update_weather,
     )
 
     search_button = IconButton(
         icon=icons.SEARCH,
         icon_color="white",
         icon_size=20,
-        on_click=update_weather,  # Make sure this line is present
-        bgcolor="lightblue600",   # Optional: add background color
+        on_click=update_weather,
+        bgcolor="lightblue600",
         style=ButtonStyle(
             shape={
                 "": RoundedRectangleBorder(radius=8),
@@ -115,27 +193,89 @@ def main(page: Page):
             search_button,
         ],
         alignment="center",
-        spacing=10,  # Add spacing between search box and button
+        spacing=10,
     )
 
     def _expand(e):
         if e.data == "true":
-            c.content.controls[1].controls[0].height = 560
-            c.content.controls[1].controls[0].update()
+            c.content.controls[1].content.controls[0].height = 560
+            c.content.controls[1].content.controls[0].update()
         else:
-            c.content.controls[1].controls[0].height = 660 * 0.40
-            c.content.controls[1].controls[0].update()
+            c.content.controls[1].content.controls[0].height = 660 * 0.40
+            c.content.controls[1].content.controls[0].update()
 
     def current_temp():
         if current[0] is not None:
             try:
                 data = current[0].json()
                 temperature = data["main"]["temp"]
-                return int(round(temperature))  # Round to nearest integer
+                return int(round(temperature))
             except (KeyError, TypeError, ValueError) as e:
                 print(f"Error getting temperature: {e}")
                 return "N/A"
         return "N/A"
+
+    # New function to create weekly forecast container
+    def weekly_forecast_container():
+        weekly_data = get_weekly_forecast()
+        
+        if not weekly_data:
+            return Container(
+                width=310,
+                height=200,
+                bgcolor="white10",
+                border_radius=20,
+                padding=15,
+                content=Column(
+                    alignment="center",
+                    horizontal_alignment="center",
+                    controls=[
+                        Text("Forecast data not available", color="white")
+                    ]
+                )
+            )
+        
+        forecast_items = []
+        for day in weekly_data:
+            day_container = Container(
+                width=300,
+                height=50,
+                border_radius=10,
+                bgcolor="white10",
+                padding=10,
+                margin=margin.only(bottom=5),
+                on_click=lambda e, day=day: update_day_weather(day),
+                content=Row(
+                    alignment="spaceBetween",
+                    controls=[
+                        Text(day['day'], color="white", size=14),
+                        Row(
+                            controls=[
+                                Text(f"{day['temp']}°C", color="white", size=14),
+                                Text(day['description'], color="white70", size=12)
+                            ],
+                            spacing=10
+                        )
+                    ]
+                )
+            )
+            forecast_items.append(day_container)
+        
+        return Container(
+            width=310,
+            height=250,
+            bgcolor="black",
+            padding=15,
+            margin=margin.only(top=10),
+            content=Column(
+                controls=[
+                    Text("Weekly Forecast", color="white", size=16, weight="bold"),
+                    *forecast_items
+                ],
+                spacing=5,
+                scroll="auto"
+            )
+        )
 
     def top():
         today_temp = current_temp()
@@ -191,11 +331,11 @@ def main(page: Page):
             gradient=LinearGradient(
                 begin=alignment.bottom_left,
                 end=alignment.top_right,
-                colors=["lightblue600", "lightblue900"],  # Fixed color names
+                colors=["lightblue600", "lightblue900"],
             ),
             border_radius=35,
             animate=animation.Animation(duration=350, curve="decelerate"),
-            on_hover=lambda e: _expand(e),
+            on_hover=_expand,
             padding=15,
             content=Column(
                 alignment="start",
@@ -221,8 +361,6 @@ def main(page: Page):
                                     Container(
                                         width=90,
                                         height=90,
-                                        # Add an image source here if needed
-                                        # image_src="./assets/cloudy.png"
                                     )
                                 ]
                             ),
@@ -277,13 +415,18 @@ def main(page: Page):
         content=Column(
             controls=[
                 search_row,
-                Stack(
+                Container(
                     width=310,
-                    height=600,  # Adjusted height to accommodate search
-                    controls=[
-                        top(),
-                    ],
-                ),
+                    height=500,  # Adjusted height for better fit
+                    content=Column(
+                        controls=[
+                            top(),
+                            weekly_forecast_container(),
+                        ],
+                        scroll="auto",
+                        spacing=10
+                    )
+                )
             ],
         ),
     )
