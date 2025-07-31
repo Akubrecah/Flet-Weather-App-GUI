@@ -91,7 +91,7 @@ To use your own OpenWeatherMap API key:
 
 Distributed under the MIT License. See `LICENSE` for more information.
 
-## 👏 Acknowledgments
+## 👏 Resources
 
 - [Flet Framework](https://flet.dev/)
 - [OpenWeatherMap API](https://openweathermap.org/api)
@@ -100,5 +100,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ---
 
 <div align="center">
-Made with ❤️ and Python
+Made by Powel Mwenesi with ❤️ and Python...
 </div>
