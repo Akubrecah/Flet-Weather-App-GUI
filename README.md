@@ -19,8 +19,6 @@ A beautiful and responsive weather application built with Python and Flet framew
 
 ## 📸 Screenshots
 
-![Weather App Screenshot](assets/screenshot.png)
-
 ## 🚀 Quick Start
 
 ### Prerequisites
